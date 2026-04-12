@@ -1,0 +1,25 @@
+{
+  "name": "SportsHub Social",
+  "short_name": "SportsHub",
+  "description": "Plataforma social para criar e participar em eventos desportivos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f8ec",
+  "theme_color": "#24592f",
+  "lang": "pt-PT",
+  "icons": [
+    {
+      "src": "/pwa-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
