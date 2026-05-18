@@ -1,0 +1,262 @@
+# ================================================================
+# SPORTSHUB SOCIAL — COMANDOS AZURE CLI
+# Copia e cola cada bloco no terminal, pela ordem apresentada.
+# Pré-requisito: ter o Azure CLI instalado
+#   Windows : https://aka.ms/installazurecliwindows
+#   macOS   : brew install azure-cli
+#   Linux   : curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+# ================================================================
+
+
+# ================================================================
+# PASSO 1 — LOGIN E RESOURCE GROUP
+# ================================================================
+
+# 1.1 — Fazer login no Azure (abre o browser)
+az login
+
+# 1.2 — Ver a subscrição activa
+az account show --output table
+
+# 1.3 — Criar o Resource Group
+az group create --name sportshub-rg --location westeurope --tags project=SportsHubSocial
+
+# 1.4 — Confirmar que foi criado
+az group show --name sportshub-rg --output table
+
+
+# ================================================================
+# PASSO 2 — AZURE COSMOS DB (Base de Dados NoSQL)
+# ================================================================
+
+# 2.1 — Criar a conta Cosmos DB
+# (pode demorar 2-3 minutos)
+az cosmosdb create --resource-group sportshub-rg --name sportshub-cosmos --kind GlobalDocumentDB --locations regionName=westeurope failoverPriority=0 isZoneRedundant=false --default-consistency-level Session --enable-free-tier true --tags project=SportsHubSocial
+
+# 2.2 — Criar a base de dados
+az cosmosdb sql database create --resource-group sportshub-rg --account-name sportshub-cosmos --name sportshub
+
+# 2.3 — Criar container: users
+az cosmosdb sql container create --resource-group sportshub-rg --account-name sportshub-cosmos --database-name sportshub --name users --partition-key-path /id --throughput 400
+
+# 2.4 — Criar container: events
+az cosmosdb sql container create --resource-group sportshub-rg --account-name sportshub-cosmos --database-name sportshub --name events --partition-key-path /id --throughput 400
+
+# 2.5 — Criar container: participations
+az cosmosdb sql container create --resource-group sportshub-rg --account-name sportshub-cosmos --database-name sportshub --name participations --partition-key-path /eventId --throughput 400
+
+# 2.6 — Criar container: ratings
+az cosmosdb sql container create --resource-group sportshub-rg --account-name sportshub-cosmos --database-name sportshub --name ratings --partition-key-path /eventId --throughput 400
+
+# 2.7 — Criar container: event-photos
+az cosmosdb sql container create --resource-group sportshub-rg --account-name sportshub-cosmos --database-name sportshub --name event-photos --partition-key-path /eventId --throughput 400
+
+# 2.8 — Criar container: sports
+az cosmosdb sql container create --resource-group sportshub-rg --account-name sportshub-cosmos --database-name sportshub --name sports --partition-key-path /id --throughput 400
+
+# 2.9 — Obter a connection string (GUARDA ESTE VALOR para o .env)
+az cosmosdb keys list --resource-group sportshub-rg --name sportshub-cosmos --type connection-strings --query "connectionStrings[0].connectionString" --output tsv
+
+# 2.10 — Listar os containers criados
+az cosmosdb sql container list --resource-group sportshub-rg --account-name sportshub-cosmos --database-name sportshub --query "[].name" --output table
+
+
+# ================================================================
+# PASSO 3 — AZURE BLOB STORAGE (Fotos e Ficheiros)
+# ================================================================
+
+# 3.1 — Criar a Storage Account
+# NOTA: o nome tem de ser único globalmente (só minúsculas e números, máx 24 chars)
+# Se der erro de nome duplicado, altera "sportshubstorage" para algo diferente
+az storage account create --resource-group sportshub-rg --name sportshubstorage --location westeurope --sku Standard_LRS --kind StorageV2 --min-tls-version TLS1_2 --allow-blob-public-access true --tags project=SportsHubSocial
+
+# 3.2 — Obter a connection string (GUARDA ESTE VALOR para o .env)
+az storage account show-connection-string --resource-group sportshub-rg --name sportshubstorage --query connectionString --output tsv
+
+# 3.3 — Guardar a connection string numa variável para usar nos próximos comandos
+BLOB_CONN=$(az storage account show-connection-string --resource-group sportshub-rg --name sportshubstorage --query connectionString --output tsv)
+
+# 3.4 — Criar container para fotos dos eventos (acesso público)
+az storage container create --name event-photos --account-name sportshubstorage --public-access blob --connection-string "$BLOB_CONN"
+
+# 3.5 — Criar container para avatares dos utilizadores (acesso público)
+az storage container create --name avatars --account-name sportshubstorage --public-access blob --connection-string "$BLOB_CONN"
+
+# 3.6 — Criar container para documentos (privado)
+az storage container create --name docs --account-name sportshubstorage --public-access off --connection-string "$BLOB_CONN"
+
+# 3.7 — Configurar CORS para o frontend poder fazer uploads
+az storage cors add --services b --methods GET PUT POST DELETE OPTIONS --origins "http://localhost:5173" "http://localhost:3000" "https://sportshub-api.azurewebsites.net" --allowed-headers "*" --exposed-headers "*" --max-age 3600 --account-name sportshubstorage --connection-string "$BLOB_CONN"
+
+# 3.8 — Confirmar os containers criados
+az storage container list --account-name sportshubstorage --connection-string "$BLOB_CONN" --query "[].{Container:name, Acesso:properties.publicAccess}" --output table
+
+# 3.9 — Obter o endpoint do Blob Storage (GUARDA para o .env)
+az storage account show --resource-group sportshub-rg --name sportshubstorage --query "primaryEndpoints.blob" --output tsv
+
+
+# ================================================================
+# PASSO 4 — AZURE CONTAINER REGISTRY (Repositório Docker)
+# ================================================================
+
+# 4.1 — Criar o Container Registry
+az acr create --resource-group sportshub-rg --name sportshubregistry --sku Basic --admin-enabled true --tags project=SportsHubSocial
+
+# 4.2 — Ver o login server do ACR
+az acr show --name sportshubregistry --query loginServer --output tsv
+
+# 4.3 — Obter username do ACR
+az acr credential show --name sportshubregistry --query username --output tsv
+
+# 4.4 — Obter password do ACR (GUARDA para usar a seguir)
+az acr credential show --name sportshubregistry --query "passwords[0].value" --output tsv
+
+# 4.5 — Fazer login no Docker com as credenciais do ACR
+# (substitui PASSWORD pelo valor obtido no comando anterior)
+docker login sportshubregistry.azurecr.io --username sportshubregistry --password PASSWORD
+
+# 4.6 — Build da imagem Docker (executa dentro da pasta backend/)
+docker build -t sportshub-api:latest ./backend
+
+# 4.7 — Dar tag à imagem para o ACR
+docker tag sportshub-api:latest sportshubregistry.azurecr.io/sportshub-api:latest
+
+# 4.8 — Fazer push da imagem para o ACR
+docker push sportshubregistry.azurecr.io/sportshub-api:latest
+
+# 4.9 — Confirmar que a imagem está no ACR
+az acr repository list --name sportshubregistry --output table
+
+
+# ================================================================
+# PASSO 5 — AZURE APP SERVICE (Hosting da API)
+# ================================================================
+
+# 5.1 — Criar o App Service Plan (plano gratuito F1)
+az appservice plan create --resource-group sportshub-rg --name sportshub-plan --location westeurope --is-linux --sku F1
+
+# 5.2 — Criar a Web App usando a imagem Docker do ACR
+az webapp create --resource-group sportshub-rg --plan sportshub-plan --name sportshub-api --deployment-container-image-name sportshubregistry.azurecr.io/sportshub-api:latest
+
+# 5.3 — Configurar as credenciais do ACR na Web App
+# (substitui PASSWORD pelo valor obtido no passo 4.4)
+az webapp config container set --resource-group sportshub-rg --name sportshub-api --docker-custom-image-name sportshubregistry.azurecr.io/sportshub-api:latest --docker-registry-server-url https://sportshubregistry.azurecr.io --docker-registry-server-user sportshubregistry --docker-registry-server-password PASSWORD
+
+# 5.4 — Configurar as variáveis de ambiente da aplicação
+# IMPORTANTE: substitui os valores entre aspas pelos que obtiveste nos passos anteriores
+az webapp config appsettings set --resource-group sportshub-rg --name sportshub-api --settings COSMOS_CONNECTION_STRING="COLA_AQUI_A_CONNECTION_STRING_DO_COSMOS" COSMOS_DATABASE="sportshub" BLOB_CONNECTION_STRING="COLA_AQUI_A_CONNECTION_STRING_DO_BLOB" BLOB_ACCOUNT_URL="https://sportshubstorage.blob.core.windows.net" JWT_SECRET="sportshub-secret-key-muda-isto-em-producao-2026" NODE_ENV="production" WEBSITES_PORT="3000" DOCKER_REGISTRY_SERVER_URL="https://sportshubregistry.azurecr.io" DOCKER_REGISTRY_SERVER_USERNAME="sportshubregistry" DOCKER_REGISTRY_SERVER_PASSWORD="COLA_AQUI_A_PASSWORD_DO_ACR"
+
+# 5.5 — Ativar os logs da aplicação
+az webapp log config --resource-group sportshub-rg --name sportshub-api --docker-container-logging filesystem --level information
+
+# 5.6 — Reiniciar a Web App
+az webapp restart --resource-group sportshub-rg --name sportshub-api
+
+# 5.7 — Ver o URL da aplicação
+az webapp show --resource-group sportshub-rg --name sportshub-api --query "defaultHostName" --output tsv
+
+# 5.8 — Testar o health check (aguarda 1-2 minutos após o restart)
+curl https://sportshub-api.azurewebsites.net/api/health
+
+# 5.9 — Ver logs em tempo real (para debug)
+az webapp log tail --resource-group sportshub-rg --name sportshub-api
+
+
+# ================================================================
+# PASSO 6 — AZURE FUNCTIONS (Ranking Automático + Limpeza)
+# ================================================================
+
+# 6.1 — Criar Storage Account para as Functions (nome diferente do anterior)
+az storage account create --resource-group sportshub-rg --name sportshubfuncstorage --location westeurope --sku Standard_LRS --kind StorageV2
+
+# 6.2 — Criar a Function App (plano Consumption = serverless, pagas só por execução)
+az functionapp create --resource-group sportshub-rg --name sportshub-functions --storage-account sportshubfuncstorage --consumption-plan-location westeurope --runtime node --runtime-version 20 --functions-version 4 --os-type Linux --tags project=SportsHubSocial
+
+# 6.3 — Configurar variáveis de ambiente nas Functions
+# (substitui o valor da connection string pelo que obtiveste no passo 2.9)
+az functionapp config appsettings set --resource-group sportshub-rg --name sportshub-functions --settings COSMOS_CONNECTION_STRING="COLA_AQUI_A_CONNECTION_STRING_DO_COSMOS" COSMOS_DATABASE="sportshub" FUNCTIONS_WORKER_RUNTIME="node" WEBSITE_RUN_FROM_PACKAGE="1"
+
+# 6.4 — Fazer deploy das Functions
+# (executa dentro da pasta backend/functions/ — requer: npm install -g azure-functions-core-tools@4)
+cd backend/functions
+npm install
+func azure functionapp publish sportshub-functions --javascript
+cd ../..
+
+# 6.5 — Listar as Functions deployadas
+az functionapp function list --resource-group sportshub-rg --name sportshub-functions --query "[].name" --output table
+
+# 6.6 — Atualizar o App Service com o URL das Functions
+az webapp config appsettings set --resource-group sportshub-rg --name sportshub-api --settings FUNCTIONS_ENDPOINT="https://sportshub-functions.azurewebsites.net"
+
+# 6.7 — Testar a Function UpdateRanking manualmente
+curl -X POST https://sportshub-functions.azurewebsites.net/api/UpdateRanking -H "Content-Type: application/json" -d "{\"ratedUserId\": \"test\"}"
+
+
+# ================================================================
+# PASSO 7 — CI/CD COM GITHUB ACTIONS
+# ================================================================
+
+# 7.1 — Criar Service Principal para o GitHub Actions
+# (guarda o JSON completo que aparecer no output — vai para o GitHub Secrets)
+az ad sp create-for-rbac --name sportshub-github-actions --role contributor --scopes /subscriptions/$(az account show --query id --output tsv)/resourceGroups/sportshub-rg --json-auth
+
+# 7.2 — Obter o Publish Profile do App Service
+# (guarda o XML completo — vai para o GitHub Secrets)
+az webapp deployment list-publishing-profiles --resource-group sportshub-rg --name sportshub-api --xml
+
+# 7.3 — Ativar deploy contínuo (CD) no App Service
+az webapp deployment container config --resource-group sportshub-rg --name sportshub-api --enable-cd true
+
+# 7.4 — Ver o webhook URL do CD (para configurar no ACR se necessário)
+az webapp deployment container show-cd-url --resource-group sportshub-rg --name sportshub-api --query CI_CD_URL --output tsv
+
+# ----------------------------------------------------------------
+# APÓS OS COMANDOS ACIMA, vai ao GitHub e cria estes Secrets:
+# (Settings → Secrets and variables → Actions → New repository secret)
+#
+#   AZURE_CREDENTIALS      → JSON do comando 7.1
+#   AZURE_PUBLISH_PROFILE  → XML do comando 7.2
+#   ACR_USERNAME           → sportshubregistry
+#   ACR_PASSWORD           → password obtida no passo 4.4
+# ----------------------------------------------------------------
+
+
+# ================================================================
+# PASSO 8 — VERIFICAÇÃO FINAL
+# ================================================================
+
+# 8.1 — Listar todos os recursos criados
+az resource list --resource-group sportshub-rg --query "[].{Tipo:type, Nome:name}" --output table
+
+# 8.2 — Verificar estado da Web App
+az webapp show --resource-group sportshub-rg --name sportshub-api --query "{Estado:state, URL:defaultHostName}" --output table
+
+# 8.3 — Verificar estado das Functions
+az functionapp show --resource-group sportshub-rg --name sportshub-functions --query "{Estado:state, URL:defaultHostName}" --output table
+
+# 8.4 — Testar health check da API
+curl https://sportshub-api.azurewebsites.net/api/health
+
+# 8.5 — Testar endpoint de eventos (deve devolver array vazio ou eventos)
+curl https://sportshub-api.azurewebsites.net/api/events
+
+# 8.6 — Testar endpoint de ranking
+curl https://sportshub-api.azurewebsites.net/api/ratings/ranking
+
+# 8.7 — Testar login (deve devolver 401 com credenciais erradas)
+curl -X POST https://sportshub-api.azurewebsites.net/api/auth/login -H "Content-Type: application/json" -d "{\"email\":\"teste@teste.com\",\"password\":\"errada\"}"
+
+# 8.8 — Ver containers Cosmos DB
+az cosmosdb sql container list --resource-group sportshub-rg --account-name sportshub-cosmos --database-name sportshub --query "[].name" --output table
+
+# 8.9 — Ver containers Blob Storage
+az storage container list --account-name sportshubstorage --query "[].{Container:name, Acesso:properties.publicAccess}" --output table
+
+
+# ================================================================
+# PASSO 9 — LIMPEZA (só executar no fim do projeto)
+# ================================================================
+
+# 9.1 — Eliminar TODOS os recursos de uma vez (IRREVERSÍVEL)
+az group delete --name sportshub-rg --yes
