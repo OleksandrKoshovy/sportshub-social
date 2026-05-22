@@ -103,6 +103,13 @@ jobs:
           app-name: sportshub-api
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
+      - name: Remover WEBSITES_PORT (conflito com Docker)
+        run: |
+          az webapp config appsettings delete \
+            --name sportshub-api \
+            --resource-group sportshub-rg \
+            --setting-names WEBSITES_PORT || true
+
       - name: Health Check após deploy
         run: |
           echo "Aguardando container arrancar..."
