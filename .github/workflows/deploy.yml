@@ -105,13 +105,18 @@ jobs:
 
       - name: Health Check após deploy
         run: |
-          sleep 30
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://sportshub-api.azurewebsites.net/api/health)
-          if [ "$STATUS" != "200" ]; then
-            echo "Health check falhou! Status: $STATUS"
-            exit 1
-          fi
-          echo "✓ Deploy bem-sucedido! Status: $STATUS"
+          echo "Aguardando container arrancar..."
+          for i in $(seq 1 12); do
+            sleep 15
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://sportshub-api.azurewebsites.net/api/health)
+            echo "Tentativa $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ Deploy bem-sucedido!"
+              exit 0
+            fi
+          done
+          echo "Health check falhou após 3 minutos"
+          exit 1
 
   # ── Job 4: Deploy das Azure Functions ──────────────────────────
   deploy-functions:
