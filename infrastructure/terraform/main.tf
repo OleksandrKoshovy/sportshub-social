@@ -166,7 +166,6 @@ resource "azurerm_linux_web_app" "api" {
     FUNCTIONS_ENDPOINT       = "https://${azurerm_linux_function_app.functions.default_hostname}"
     FRONTEND_URL             = var.frontend_url
     NODE_ENV                 = "production"
-    WEBSITES_PORT            = "3000"
   }
 
   tags = azurerm_resource_group.rg.tags
