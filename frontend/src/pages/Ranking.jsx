@@ -5,9 +5,14 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 const MEDAL_CLS = ['gold', 'silver', 'bronze'];
 
 export default function Ranking() {
-  const [ranking, setRanking] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sport, setSport]     = useState('');
+  const [ranking, setRanking]         = useState([]);
+  const [totalRatings, setTotalRatings] = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [sport, setSport]             = useState('');
+
+  useEffect(() => {
+    ratingService.getStats().then(({ data }) => setTotalRatings(data.totalRatings)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -38,7 +43,7 @@ export default function Ranking() {
 
       <div className="stats-grid sg-3" style={{ marginBottom: 24 }}>
         <div className="stat-card"><div className="stat-lbl">Jogadores Ativos</div><div className="stat-val sv-g">{ranking.length}</div></div>
-        <div className="stat-card"><div className="stat-lbl">Avaliações Totais</div><div className="stat-val sv-b">{ranking.reduce((s, u) => s + (u.eventsCount || 0), 0)}</div></div>
+        <div className="stat-card"><div className="stat-lbl">Avaliações Totais</div><div className="stat-val sv-b">{totalRatings}</div></div>
         <div className="stat-card"><div className="stat-lbl">Média Geral</div>
           <div className="stat-val sv-o">
             {ranking.length ? (ranking.reduce((s, u) => s + u.avgRating, 0) / ranking.length).toFixed(1) : '—'} ⭐

@@ -114,12 +114,15 @@ export default function Admin() {
                       <div style={{ fontSize: 11, color: 'var(--t3)' }}>{e.organizerName} · {e.currentParticipants}/{e.maxParticipants}</div>
                     </td>
                     <td>
-                      <span className={`badge ${e.status === 'active' ? 'b-ok' : e.status === 'completed' ? 'b-warn' : 'b-err'}`}>
-                        {{ active:'Ativo', completed:'Concluído', cancelled:'Cancelado' }[e.status] || e.status}
-                      </span>
+                      {(() => {
+                        const isPast = new Date(e.dateTime) < new Date();
+                        const label = e.status === 'cancelled' ? 'Cancelado' : isPast ? 'Concluído' : 'Ativo';
+                        const cls   = e.status === 'cancelled' ? 'b-err' : isPast ? 'b-warn' : 'b-ok';
+                        return <span className={`badge ${cls}`}>{label}</span>;
+                      })()}
                     </td>
                     <td>
-                      {e.status === 'active' && (
+                      {e.status === 'active' && new Date(e.dateTime) >= new Date() && (
                         <button className="btn btn-xs btn-danger" onClick={() => handleCancelEvent(e.id, e.title)}>
                           Cancelar
                         </button>

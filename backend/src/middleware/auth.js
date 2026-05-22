@@ -27,4 +27,15 @@ const adminMiddleware = (req, res, next) => {
   next();
 };
 
-module.exports = { authMiddleware, adminMiddleware };
+// ── Token opcional — popula req.user se existir, não bloqueia ──
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      req.user = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
+    } catch {}
+  }
+  next();
+};
+
+module.exports = { authMiddleware, adminMiddleware, optionalAuth };

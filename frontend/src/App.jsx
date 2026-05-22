@@ -12,6 +12,7 @@ import CreateEvent   from './pages/CreateEvent';
 import Ranking       from './pages/Ranking';
 import Profile       from './pages/Profile';
 import Admin         from './pages/Admin';
+import MyEvents      from './pages/MyEvents';
 
 // Rota protegida — redireciona para login se não autenticado
 function PrivateRoute({ children }) {
@@ -33,15 +34,18 @@ export default function App() {
       {/* Páginas sem sidebar */}
       <Route path="/login"    element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/"         element={<Landing />} />
 
       {/* Páginas com sidebar */}
       <Route element={<Layout />}>
-        <Route path="/"       element={<Landing />} />
-        <Route path="/feed"   element={<Feed />} />
+        <Route path="/feed"    element={<Feed />} />
         <Route path="/events/:id" element={<EventDetail />} />
         <Route path="/ranking" element={<Ranking />} />
 
         {/* Rotas protegidas */}
+        <Route path="/my-events" element={
+          <PrivateRoute><MyEvents /></PrivateRoute>
+        } />
         <Route path="/create" element={
           <PrivateRoute><CreateEvent /></PrivateRoute>
         } />

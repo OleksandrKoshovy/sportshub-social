@@ -9,10 +9,15 @@ export default function Layout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleLogout = () => setShowLogoutModal(true);
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
     logout();
     toast.success('Sessão terminada.');
-    navigate('/login');
+    navigate('/');
   };
 
   const navClass = ({ isActive }) =>
@@ -33,19 +38,21 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sb-logo">
+        <div className="sb-logo" style={{ cursor: 'pointer' }} onClick={() => { navigate('/'); setSidebarOpen(false); }}>
           <div className="logo">Sports<span>Hub</span></div>
           <div className="logo-tag">Social Platform</div>
         </div>
 
         <nav className="sb-nav">
           <div className="nav-group">Principal</div>
-          <NavLink to="/"       className={navClass} end onClick={() => setSidebarOpen(false)}>
-            <span className="ico">🏠</span>Início
-          </NavLink>
           <NavLink to="/feed"   className={navClass} onClick={() => setSidebarOpen(false)}>
             <span className="ico">⚡</span>Feed de Eventos
           </NavLink>
+          {user && (
+            <NavLink to="/my-events" className={navClass} onClick={() => setSidebarOpen(false)}>
+              <span className="ico">📋</span>Os Meus Eventos
+            </NavLink>
+          )}
           {user && (
             <NavLink to="/create" className={navClass} onClick={() => setSidebarOpen(false)}>
               <span className="ico">➕</span>Criar Evento
@@ -107,6 +114,34 @@ export default function Layout() {
       <main style={{ flex: 1, marginLeft: 248, minHeight: '100vh' }}>
         <Outlet />
       </main>
+
+      {/* Modal confirmação logout */}
+      {showLogoutModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div className="card" style={{ width: 340, textAlign: 'center', padding: 32 }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🚪</div>
+            <h3 style={{ fontFamily: 'Syne', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+              Terminar Sessão?
+            </h3>
+            <p style={{ fontSize: 13.5, color: 'var(--t2)', marginBottom: 24 }}>
+              Tens a certeza que queres sair da tua conta?
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button className="btn btn-ghost" style={{ flex: 1, padding: 10 }}
+                onClick={() => setShowLogoutModal(false)}>
+                Cancelar
+              </button>
+              <button className="btn btn-primary" style={{ flex: 1, padding: 10, background: '#ef4444', borderColor: '#ef4444' }}
+                onClick={confirmLogout}>
+                Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

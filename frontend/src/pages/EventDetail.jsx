@@ -27,6 +27,7 @@ export default function EventDetail() {
   const [joining, setJoining]           = useState(false);
   const [showUpload, setShowUpload]     = useState(false);
   const [photos, setPhotos]             = useState([]);
+  const [ratedIds, setRatedIds]         = useState(new Set());
 
   // Avaliação
   const [rateTarget, setRateTarget]   = useState('');
@@ -43,6 +44,17 @@ export default function EventDetail() {
       setEvent(evRes.data);
       setParticipants(ptRes.data);
       setPhotos(evRes.data.photoUrls || []);
+
+      // Buscar avaliações já feitas pelo utilizador neste evento
+      if (user) {
+        try {
+          const { data: givenRatings } = await ratingService.getGiven(user.id);
+          const alreadyRated = new Set(
+            givenRatings.filter(r => r.eventId === id).map(r => r.ratedId)
+          );
+          setRatedIds(alreadyRated);
+        } catch {}
+      }
     } catch {
       toast.error('Evento não encontrado.');
       navigate('/feed');
@@ -86,6 +98,7 @@ export default function EventDetail() {
         comment:     rateComment,
       });
       toast.success('Avaliação enviada! Ranking atualizado.');
+      setRatedIds(prev => new Set([...prev, rateTarget]));
       setRateTarget(''); setRateScore(0); setRateComment('');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Erro ao enviar avaliação.');
@@ -237,45 +250,80 @@ export default function EventDetail() {
           </div>
 
           {/* Avaliar — só se evento passado e o utilizador participou */}
-          {isPast && user && event.isJoined && (
-            <div className="card">
-              <div className="sec-lbl">Avaliar Participante</div>
-              <div className="fg">
-                <label>Participante</label>
-                <select className="fi" value={rateTarget} onChange={(e) => setRateTarget(e.target.value)}>
-                  <option value="">Seleciona...</option>
-                  {participants
-                    .filter(p => p.userId !== user.id)
-                    .map(p => (
+          {isPast && user && event.isJoined && (() => {
+            const toRate = participants.filter(p => p.userId !== user.id && !ratedIds.has(p.userId));
+            return toRate.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Todos avaliados!</div>
+                <div style={{ fontSize: 13, color: 'var(--t2)' }}>Já avaliaste todos os participantes deste evento.</div>
+              </div>
+            ) : (
+              <div className="card">
+                <div className="sec-lbl">Avaliar Participantes</div>
+                <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 14 }}>
+                  {toRate.length} participante{toRate.length !== 1 ? 's' : ''} por avaliar
+                </div>
+
+                {/* Avaliar todos de uma vez */}
+                {toRate.length > 1 && (
+                  <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--s)', borderRadius: 10, border: '1px solid var(--b)' }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>⚡ Avaliar todos de uma vez</div>
+                    <StarRating value={rateScore} onChange={setRateScore} size={24} />
+                    <input type="text" className="fi" placeholder="Comentário para todos (opcional)"
+                      value={rateComment} onChange={e => setRateComment(e.target.value)}
+                      style={{ marginTop: 8, marginBottom: 8 }} />
+                    <button className="btn btn-primary btn-sm" style={{ width: '100%' }}
+                      disabled={submitting || !rateScore}
+                      onClick={async () => {
+                        if (!rateScore) return;
+                        setSubmitting(true);
+                        const newRated = new Set(ratedIds);
+                        for (const p of toRate) {
+                          try {
+                            await ratingService.submit({ eventId: id, ratedUserId: p.userId, score: rateScore, comment: rateComment });
+                            newRated.add(p.userId);
+                          } catch {}
+                        }
+                        setRatedIds(newRated);
+                        setRateScore(0); setRateComment('');
+                        setSubmitting(false);
+                        toast.success('Todos os participantes avaliados!');
+                      }}>
+                      {submitting ? 'A enviar...' : `Avaliar todos (${toRate.length}) com ★${rateScore || '?'}`}
+                    </button>
+                  </div>
+                )}
+
+                {/* Avaliar individualmente */}
+                <div className="fg">
+                  <label>{toRate.length > 1 ? 'Ou escolhe individualmente' : 'Participante'}</label>
+                  <select className="fi" value={rateTarget} onChange={(e) => setRateTarget(e.target.value)}>
+                    <option value="">Seleciona participante...</option>
+                    {toRate.map(p => (
                       <option key={p.userId} value={p.userId}>
                         {p.user?.fullName || p.userId}
                       </option>
                     ))}
-                </select>
+                  </select>
+                </div>
+                <div className="fg">
+                  <label>Classificação</label>
+                  <StarRating value={rateScore} onChange={setRateScore} size={28} />
+                </div>
+                <div className="fg" style={{ marginBottom: 12 }}>
+                  <label>Comentário (opcional)</label>
+                  <input type="text" className="fi" placeholder="Ex: Excelente fair-play!"
+                    value={rateComment} onChange={(e) => setRateComment(e.target.value)} />
+                </div>
+                <button className="btn btn-primary btn-sm"
+                  onClick={handleRating}
+                  disabled={submitting || !rateTarget || !rateScore}>
+                  {submitting ? 'A enviar...' : 'Enviar Avaliação'}
+                </button>
               </div>
-              <div className="fg">
-                <label>Classificação</label>
-                <StarRating value={rateScore} onChange={setRateScore} size={28} />
-              </div>
-              <div className="fg" style={{ marginBottom: 12 }}>
-                <label>Comentário (opcional)</label>
-                <input
-                  type="text"
-                  className="fi"
-                  placeholder="Ex: Excelente fair-play!"
-                  value={rateComment}
-                  onChange={(e) => setRateComment(e.target.value)}
-                />
-              </div>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={handleRating}
-                disabled={submitting || !rateTarget || !rateScore}
-              >
-                {submitting ? 'A enviar...' : 'Enviar Avaliação'}
-              </button>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

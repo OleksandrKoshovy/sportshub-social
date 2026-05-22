@@ -42,6 +42,44 @@ router.put('/profile', authMiddleware, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/users/me/events — eventos do utilizador (criados + participações)
+router.get('/me/events', authMiddleware, async (req, res, next) => {
+  try {
+    const eventsContainer = req.app.locals.db.events;
+    const participationsContainer = req.app.locals.db.participations;
+    const uid = req.user.id;
+
+    // Eventos criados pelo utilizador
+    const { resources: created } = await eventsContainer.items
+      .query({ query: 'SELECT * FROM c WHERE c.organizerId = @uid', parameters: [{ name: '@uid', value: uid }] })
+      .fetchAll();
+
+    // Participações do utilizador
+    const { resources: parts } = await participationsContainer.items
+      .query({ query: 'SELECT * FROM c WHERE c.userId = @uid', parameters: [{ name: '@uid', value: uid }] })
+      .fetchAll();
+
+    // Buscar eventos das participações (excluindo os que já criou)
+    const createdIds = new Set(created.map(e => e.id));
+    const participatingEvents = [];
+    for (const p of parts) {
+      if (createdIds.has(p.eventId)) continue;
+      const { resources: evs } = await eventsContainer.items
+        .query({ query: 'SELECT * FROM c WHERE c.id = @id', parameters: [{ name: '@id', value: p.eventId }] })
+        .fetchAll();
+      if (evs[0]) participatingEvents.push({ ...evs[0], isJoined: true });
+    }
+
+    const now = new Date();
+    res.json({
+      created:      created.map(e => ({ ...e, isJoined: true })),
+      participating: participatingEvents,
+      upcoming:     [...created, ...participatingEvents].filter(e => new Date(e.dateTime) >= now),
+      past:         [...created, ...participatingEvents].filter(e => new Date(e.dateTime) < now),
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /api/users/:id — perfil público
 router.get('/:id', async (req, res, next) => {
   try {

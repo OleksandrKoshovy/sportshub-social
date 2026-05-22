@@ -84,15 +84,31 @@ router.post('/', authMiddleware, async (req, res, next) => {
 
     const { resource: created } = await ratingsContainer.items.create(newRating);
 
-    // Disparar atualização do ranking via Azure Functions (HTTP trigger)
+    // Atualizar avgRating e rankingPoints do utilizador avaliado
     try {
-      await fetch(`${process.env.FUNCTIONS_ENDPOINT}/api/UpdateRanking`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId, ratedUserId }),
-      });
-    } catch (fnErr) {
-      console.warn('[WARN] Azure Function não disponível:', fnErr.message);
+      const usersContainer = req.app.locals.db.users;
+
+      // Buscar todas as avaliações deste utilizador
+      const { resources: allRatings } = await ratingsContainer.items
+        .query({ query: 'SELECT c.score FROM c WHERE c.ratedId = @uid', parameters: [{ name: '@uid', value: ratedUserId }] })
+        .fetchAll();
+
+      const avgRating = allRatings.length
+        ? Math.round((allRatings.reduce((s, r) => s + r.score, 0) / allRatings.length) * 10) / 10
+        : 0;
+
+      // Buscar utilizador e atualizar
+      const { resources: userList } = await usersContainer.items
+        .query({ query: 'SELECT * FROM c WHERE c.id = @id', parameters: [{ name: '@id', value: ratedUserId }] })
+        .fetchAll();
+
+      if (userList[0]) {
+        const u = userList[0];
+        const rankingPoints = Math.round(avgRating * 20) + (u.eventsCount || 0) * 5;
+        await usersContainer.item(u.id, u.id).replace({ ...u, avgRating, rankingPoints });
+      }
+    } catch (rankErr) {
+      console.warn('[WARN] Erro ao atualizar ranking:', rankErr.message);
     }
 
     res.status(201).json(created);
@@ -101,7 +117,7 @@ router.post('/', authMiddleware, async (req, res, next) => {
   }
 });
 
-// GET /api/ratings/user/:userId — avaliações de um utilizador
+// GET /api/ratings/user/:userId — avaliações recebidas por um utilizador
 router.get('/user/:userId', async (req, res, next) => {
   try {
     const ratingsContainer = req.app.locals.db.ratings;
@@ -111,6 +127,34 @@ router.get('/user/:userId', async (req, res, next) => {
         parameters: [{ name: '@uid', value: req.params.userId }],
       }).fetchAll();
     res.json(resources);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/ratings/given/:userId — avaliações feitas por um utilizador
+router.get('/given/:userId', async (req, res, next) => {
+  try {
+    const ratingsContainer = req.app.locals.db.ratings;
+    const { resources } = await ratingsContainer.items
+      .query({
+        query: 'SELECT * FROM c WHERE c.raterId = @uid',
+        parameters: [{ name: '@uid', value: req.params.userId }],
+      }).fetchAll();
+    res.json(resources);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/ratings/stats — estatísticas globais de avaliações
+router.get('/stats', async (req, res, next) => {
+  try {
+    const ratingsContainer = req.app.locals.db.ratings;
+    const { resources } = await ratingsContainer.items
+      .query({ query: 'SELECT VALUE COUNT(1) FROM c' })
+      .fetchAll();
+    res.json({ totalRatings: resources[0] || 0 });
   } catch (err) {
     next(err);
   }

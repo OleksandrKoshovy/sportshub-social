@@ -35,10 +35,12 @@ export default function Login() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div className="logo" style={{ fontSize: 26, justifyContent: 'center', display: 'flex' }}>
+          <div className="logo" style={{ fontSize: 26, justifyContent: 'center', display: 'flex', cursor: 'pointer' }}
+            onClick={() => navigate('/')}>
             Sports<span>Hub</span>
           </div>
-          <div className="logo-tag" style={{ textAlign: 'center', marginTop: 4 }}>Social Platform</div>
+          <div className="logo-tag" style={{ textAlign: 'center', marginTop: 4, cursor: 'pointer', color: 'var(--t3)' }}
+            onClick={() => navigate('/')}>Social Platform</div>
         </div>
         <h3 style={{ fontFamily: 'Syne', fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Bem-vindo de volta</h3>
         <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 22 }}>Entra na tua conta para continuar</p>

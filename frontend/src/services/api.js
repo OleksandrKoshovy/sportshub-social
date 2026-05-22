@@ -11,8 +11,8 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      // Token expirado — limpar sessão
+    if (error.response?.status === 401 && localStorage.getItem('sh_token')) {
+      // Token expirado — limpar sessão e redirecionar
       localStorage.removeItem('sh_token');
       localStorage.removeItem('sh_user');
       window.location.href = '/login';
@@ -43,9 +43,11 @@ export const eventService = {
 
 // ── Funções de Avaliações ────────────────────────────────────
 export const ratingService = {
-  submit:     (data)   => api.post('/ratings', data),
-  getByUser:  (userId) => api.get(`/ratings/user/${userId}`),
-  getRanking: (params) => api.get('/ratings/ranking', { params }),
+  submit:      (data)   => api.post('/ratings', data),
+  getByUser:   (userId) => api.get(`/ratings/user/${userId}`),
+  getGiven:    (userId) => api.get(`/ratings/given/${userId}`),
+  getRanking:  (params) => api.get('/ratings/ranking', { params }),
+  getStats:    ()       => api.get('/ratings/stats'),
 };
 
 // ── Funções de Utilizadores ──────────────────────────────────

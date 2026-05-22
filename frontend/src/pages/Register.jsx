@@ -54,9 +54,12 @@ export default function Register() {
     <div className="auth-wrap" style={{ alignItems: 'flex-start', paddingTop: 40 }}>
       <div className="auth-card" style={{ maxWidth: 500 }}>
         <div style={{ textAlign: 'center', marginBottom: 22 }}>
-          <div className="logo" style={{ fontSize: 24, justifyContent: 'center', display: 'flex' }}>
+          <div className="logo" style={{ fontSize: 24, justifyContent: 'center', display: 'flex', cursor: 'pointer' }}
+            onClick={() => navigate('/')}>
             Sports<span>Hub</span>
           </div>
+          <div className="logo-tag" style={{ textAlign: 'center', marginTop: 4, cursor: 'pointer', color: 'var(--t3)' }}
+            onClick={() => navigate('/')}>Social Platform</div>
         </div>
         <h3 style={{ fontFamily: 'Syne', fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Criar conta</h3>
         <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 22 }}>Junta-te à comunidade desportiva</p>

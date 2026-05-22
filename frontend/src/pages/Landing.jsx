@@ -2,19 +2,42 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EventCard from '../components/EventCard';
 import { eventService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function Landing() {
   const navigate = useNavigate();
   const [featured, setFeatured] = useState([]);
+  const { user } = useAuth();
 
   useEffect(() => {
-    eventService.getAll({ sort: 'date' })
+    if (user) { navigate('/feed', { replace: true }); return; }
+    eventService.getAll({ sort: 'date', upcoming: 'true' })
       .then(({ data }) => setFeatured(data.events.slice(0, 3)))
       .catch(() => {});
-  }, []);
+  }, [user]);
 
   return (
     <div style={{ padding: 0 }}>
+      {/* Navbar */}
+      <nav style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 40px', position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <div className="logo" style={{ fontSize: 20 }}>Sports<span>Hub</span></div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-ghost" style={{ padding: '8px 20px', fontSize: 14 }}
+            onClick={() => navigate('/login')}>
+            Entrar
+          </button>
+          <button className="btn btn-primary" style={{ padding: '8px 20px', fontSize: 14 }}
+            onClick={() => navigate('/register')}>
+            Registar
+          </button>
+        </div>
+      </nav>
+
       {/* Hero */}
       <div className="land-hero">
         <div className="hero-inner">
@@ -30,8 +53,8 @@ export default function Landing() {
               Criar Conta Grátis
             </button>
             <button className="btn btn-ghost" style={{ padding: '13px 32px', fontSize: 15 }}
-              onClick={() => navigate('/feed')}>
-              Explorar Eventos →
+              onClick={() => navigate('/login')}>
+              Entrar →
             </button>
           </div>
         </div>

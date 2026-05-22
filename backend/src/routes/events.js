@@ -1,16 +1,24 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, optionalAuth } = require('../middleware/auth');
 const router = express.Router();
 
 // GET /api/events — listar eventos com filtros
-router.get('/', async (req, res, next) => {
+router.get('/', optionalAuth, async (req, res, next) => {
   try {
-    const { sport, city, date, available, sort = 'date', page = 1, limit = 20 } = req.query;
+    const { sport, city, date, available, sort = 'date', page = 1, limit = 20, upcoming } = req.query;
     const eventsContainer = req.app.locals.db.events;
+    const participationsContainer = req.app.locals.db.participations;
 
     let query = 'SELECT * FROM c WHERE c.status != "cancelled"';
     const parameters = [];
+
+    // Por defeito só mostra eventos futuros (a menos que upcoming=false explicitamente)
+    if (upcoming !== 'false') {
+      const now = new Date().toISOString();
+      query += ' AND c.dateTime >= @now';
+      parameters.push({ name: '@now', value: now });
+    }
 
     if (sport)     { query += ' AND c.sport = @sport';  parameters.push({ name: '@sport', value: sport }); }
     if (city)      { query += ' AND CONTAINS(c.location, @city, true)'; parameters.push({ name: '@city', value: city }); }
@@ -24,22 +32,45 @@ router.get('/', async (req, res, next) => {
       .query({ query, parameters })
       .fetchAll();
 
-    res.json({ events, total: events.length, page: parseInt(page) });
+    // Marcar isJoined se utilizador autenticado
+    let joinedIds = new Set();
+    if (req.user) {
+      const { resources: parts } = await participationsContainer.items
+        .query({ query: 'SELECT c.eventId FROM c WHERE c.userId = @uid', parameters: [{ name: '@uid', value: req.user.id }] })
+        .fetchAll();
+      joinedIds = new Set(parts.map(p => p.eventId));
+    }
+
+    const enriched = events.map(e => ({ ...e, isJoined: joinedIds.has(e.id) }));
+    res.json({ events: enriched, total: enriched.length, page: parseInt(page) });
   } catch (err) {
     next(err);
   }
 });
 
 // GET /api/events/:id — detalhe de um evento
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', optionalAuth, async (req, res, next) => {
   try {
     const eventsContainer = req.app.locals.db.events;
+    const participationsContainer = req.app.locals.db.participations;
+
     const { resources } = await eventsContainer.items
       .query({ query: 'SELECT * FROM c WHERE c.id = @id', parameters: [{ name: '@id', value: req.params.id }] })
       .fetchAll();
 
     if (!resources.length) return res.status(404).json({ error: 'Evento não encontrado.' });
-    res.json(resources[0]);
+
+    let isJoined = false;
+    if (req.user) {
+      const { resources: parts } = await participationsContainer.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.eventId = @eid AND c.userId = @uid',
+          parameters: [{ name: '@eid', value: req.params.id }, { name: '@uid', value: req.user.id }],
+        }).fetchAll();
+      isJoined = parts.length > 0;
+    }
+
+    res.json({ ...resources[0], isJoined });
   } catch (err) {
     next(err);
   }
@@ -219,7 +250,7 @@ router.delete('/:id/join', authMiddleware, async (req, res, next) => {
 
     if (!parts.length) return res.status(404).json({ error: 'Não estás inscrito neste evento.' });
 
-    await participationsContainer.item(parts[0].id, parts[0].id).delete();
+    await participationsContainer.item(parts[0].id, parts[0].eventId).delete();
     await eventsContainer.item(event.id, event.id).replace({
       ...event,
       currentParticipants: Math.max(0, event.currentParticipants - 1),
