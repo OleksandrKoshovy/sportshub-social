@@ -1,0 +1,15 @@
+.claude/
+node_modules/
+dist/
+.env
+.env.local
+*.zip
+api-logs/
+api-logs2/
+_deploy_tmp*/
+backend-deploy.zip
+backend-v2.zip
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/.terraform.lock.hcl
