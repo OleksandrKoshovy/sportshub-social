@@ -175,7 +175,7 @@ resource "azurerm_linux_web_app" "api" {
 resource "azurerm_storage_account" "func_storage" {
   name                     = "${var.prefix}funcstorage"
   resource_group_name      = azurerm_resource_group.rg.name
-  location                 = azurerm_resource_group.rg.location
+  location                 = var.functions_location
   account_tier             = "Standard"
   account_replication_type = "LRS"
 }
@@ -183,7 +183,7 @@ resource "azurerm_storage_account" "func_storage" {
 resource "azurerm_service_plan" "func_plan" {
   name                = "${var.prefix}-func-plan"
   resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
+  location            = var.functions_location
   os_type             = "Linux"
   sku_name            = "Y1" # Consumption (serverless)
 }
@@ -191,7 +191,7 @@ resource "azurerm_service_plan" "func_plan" {
 resource "azurerm_linux_function_app" "functions" {
   name                       = "${var.prefix}-functions"
   resource_group_name        = azurerm_resource_group.rg.name
-  location                   = azurerm_resource_group.rg.location
+  location                   = var.functions_location
   storage_account_name       = azurerm_storage_account.func_storage.name
   storage_account_access_key = azurerm_storage_account.func_storage.primary_access_key
   service_plan_id            = azurerm_service_plan.func_plan.id

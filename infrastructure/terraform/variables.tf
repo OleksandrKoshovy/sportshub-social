@@ -7,7 +7,13 @@ variable "resource_group_name" {
 variable "location" {
   description = "Região Azure onde os recursos serão criados"
   type        = string
-  default     = "West Europe"
+  default     = "francecentral"
+}
+
+variable "functions_location" {
+  description = "Região Azure para as Azure Functions (pode diferir da API)"
+  type        = string
+  default     = "germanywestcentral"
 }
 
 variable "prefix" {
@@ -30,7 +36,7 @@ variable "environment" {
 variable "app_service_sku" {
   description = "SKU do App Service Plan (F1 = gratuito, B1 = básico pago)"
   type        = string
-  default     = "F1"
+  default     = "B1"
 }
 
 variable "jwt_secret" {
@@ -42,5 +48,5 @@ variable "jwt_secret" {
 variable "frontend_url" {
   description = "URL do frontend (para CORS e redirect)"
   type        = string
-  default     = "https://sportshub-social.azurewebsites.net"
+  default     = "https://sportshubstorage.z28.web.core.windows.net"
 }
