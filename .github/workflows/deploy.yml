@@ -7,7 +7,7 @@ on:
     branches: [master, main]
 
 env:
-  REGISTRY: sportshubregistry.azurecr.io
+  REGISTRY: sh2026registry.azurecr.io
   IMAGE_NAME: sportshub-api
 
 jobs:
@@ -89,7 +89,7 @@ jobs:
 
     environment:
       name: production
-      url: https://sportshub-api.azurewebsites.net
+      url: https://sh2026-api.azurewebsites.net
 
     steps:
       - name: Login no Azure
@@ -100,22 +100,15 @@ jobs:
       - name: Deploy para Azure App Service
         uses: azure/webapps-deploy@v3
         with:
-          app-name: sportshub-api
+          app-name: sh2026-api
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-      - name: Remover WEBSITES_PORT (conflito com Docker)
-        run: |
-          az webapp config appsettings delete \
-            --name sportshub-api \
-            --resource-group sportshub-rg \
-            --setting-names WEBSITES_PORT || true
 
       - name: Health Check após deploy
         run: |
           echo "Aguardando container arrancar..."
           for i in $(seq 1 12); do
             sleep 15
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://sportshub-api.azurewebsites.net/api/health)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://sh2026-api.azurewebsites.net/api/health)
             echo "Tentativa $i: HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "✓ Deploy bem-sucedido!"
@@ -153,7 +146,7 @@ jobs:
       - name: Deploy Azure Functions
         uses: Azure/functions-action@v1
         with:
-          app-name: sportshub-functions
+          app-name: sh2026-functions
           package: backend/functions
           respect-funcignore: true
 
@@ -183,7 +176,7 @@ jobs:
         working-directory: frontend
         run: npm run build
         env:
-          VITE_API_URL: https://sportshub-api.azurewebsites.net/api
+          VITE_API_URL: https://sh2026-api.azurewebsites.net/api
 
       - name: Login no Azure
         uses: azure/login@v2
@@ -196,7 +189,7 @@ jobs:
           azcliversion: latest
           inlineScript: |
             az storage blob upload-batch \
-              --account-name sportshubstorage \
+              --account-name sh2026storage \
               --destination '$web' \
               --source frontend/dist \
               --overwrite true
